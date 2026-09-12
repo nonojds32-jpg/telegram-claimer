@@ -25,7 +25,7 @@ API_ID = 17555684
 API_HASH = '5a7f2bfea72f4df4d0bd1e8291821148'
 
 # قائمة اليوزرات المطلوبة (بدون @)
-TARGET_USERNAMES = ['test_user_claimer_9988']
+TARGET_USERNAMES = ['EFE_E']
 
 # زمن الانتظار بين المحاولات (بالثواني)
 CHECK_INTERVAL = 3
