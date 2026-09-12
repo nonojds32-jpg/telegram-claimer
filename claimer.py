@@ -1,3 +1,20 @@
+import threading
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# خادم وهمي لإبقاء الخدمة مجانية وشغالة على Render
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_web_server, daemon=True).start()
 import asyncio
 from telethon import TelegramClient
 from telethon.tl.functions.channels import UpdateUsernameRequest, CreateChannelRequest
