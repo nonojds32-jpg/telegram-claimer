@@ -1,13 +1,17 @@
-import threading
+import asyncio
 import os
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from telethon import TelegramClient
+from telethon.tl.functions.channels import CreateChannelRequest, UpdateUsernameRequest
+from telethon.errors import UsernameInvalidError, UsernameOccupiedError, FloodWaitError
 
-# خادم وهمي لإبقاء الخدمة مجانية وشغالة على Render
+# خادم وهمي للمنصات السحابية
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is running!")
+        self.wfile.write(b"Claimer Bot is Running!")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -15,59 +19,73 @@ def run_web_server():
     server.serve_forever()
 
 threading.Thread(target=run_web_server, daemon=True).start()
-import asyncio
-from telethon import TelegramClient
-from telethon.tl.functions.channels import UpdateUsernameRequest, CreateChannelRequest
-from telethon.errors import UsernameInvalidError, UsernameOccupiedError, FloodWaitError
 
-# بيانات API الخاصة بك من my.telegram.org
-API_ID = 17555684  # استبدله برقم API ID الخاص بك
-API_HASH = '5a7f2bfea72f4df4d0bd1e8291821148'  # استبدله بـ API Hash الخاص بك
+# إعدادات الحساب
+API_ID = 17555684
+API_HASH = '5a7f2bfea72f4df4d0bd1e8291821148'
 
-# قائمة اليوزرات التي تريد مراقبتها (بدون @)
+# قائمة اليوزرات المطلوبة (بدون @)
 TARGET_USERNAMES = ['test_user_claimer_9988']
 
-# زمن الانتظار بين كل محاولة بالثواني (مهم جداً لتجنب الحظر)
-CHECK_INTERVAL = 3  
+# زمن الانتظار بين المحاولات (بالثواني)
+CHECK_INTERVAL = 3
 
 client = TelegramClient('session_claimer', API_ID, API_HASH)
 
+# متغير لحفظ القناة المجهزة للحجز
+target_channel = None
+
+async def prepare_channel():
+    global target_channel
+    if not target_channel:
+        print("[*] جاري إنشاء قناة واحدة جاهزة لاستقبال اليوزر...")
+        result = await client(CreateChannelRequest(
+            title="Reserved Username",
+            about="Reserved via Claimer Bot",
+            megagroup=False
+        ))
+        target_channel = result.chats[0]
+        print(f"[✓] تم إنشاء القناة المجهزة بنجاح ID: {target_channel.id}")
+
 async def check_and_claim(username):
+    global target_channel
     try:
-        # المحاولة المباشرة لفحص وحجز اليوزر في قناة جديدة
-        # أنشئ قناة مجانية مؤقتة ثم حاول تعيين اليوزر لها
-        result = await client(CreateChannelRequest(title=f"Reserved {username}", about="Reserved Username", megagroup=False))
-        channel = result.chats[0]
-        
-        await client(UpdateUsernameRequest(channel=channel, username=username))
-        print(f"[+] مبروك! تم حجز اليوزر @{username} بنجاح على القناة!")
+        # المحاولة المباشرة لربط اليوزر بالقناة المجهزة سابقاً
+        await client(UpdateUsernameRequest(channel=target_channel, username=username))
+        print(f"\n[🎉] مبروك! تم حجز اليوزر @{username} بنجاح!")
         return True
     except UsernameOccupiedError:
-        # اليوزر ما زال مشغولاً
+        # اليوزر ما زال مشغولاً (طبيعي)
         return False
     except UsernameInvalidError:
-        print(f"[-] اليوزر @{username} غير صالحة صيغته أو محظور نهائياً من تليجرام.")
+        print(f"\n[❌] اليوزر @{username} غير صالح أو محظور نهائياً.")
         return False
     except FloodWaitError as e:
-        print(f"[!] تحذير: قيود السرعة من تليجرام (FloodWait). يجب الانتظار {e.seconds} ثانية.")
+        print(f"\n[⚠️] تم فرض حظر مؤقت (FloodWait). يجب الانتظار {e.seconds} ثانية.")
         await asyncio.sleep(e.seconds)
         return False
     except Exception as e:
-        # في حال وجود خطأ آخر (مثل أن الحساب صاحب اليوزر لا يزال حياً)
+        print(f"\n[❌] حدث خطأ أخير: {e}")
         return False
 
 async def main():
     await client.start()
-    print("[*] تم تشغيل السكربت وبدء مراقبة اليوزرات...")
+    print("[✓] تم تسجيل الدخول بنجاح إلى تليجرام.")
     
-    while TARGET_USERNAMES:
-        for username in list(TARGET_USERNAMES):
-            print(f"[*] جاري فحص @{username}...")
-            claimed = await check_and_claim(username)
-            if claimed:
-                TARGET_USERNAMES.remove(username)
-            await asyncio.sleep(CHECK_INTERVAL)
+    # إنشاء قناة واحدة فقط لاستخدامها لكل المحاولات
+    await prepare_channel()
+    
+    print("\n[*] بدأ المراقبة وفحص اليوزرات...")
+    
+    while True:
+        for username in TARGET_USERNAMES:
+            print(f"\r[*] جاري فحص اليوزر: @{username}...", end="", flush=True)
+            success = await check_and_claim(username)
+            if success:
+                print(f"[✓] تم إيقاف السكربت للحفاظ على اليوزر المحجوز.")
+                return
+        await asyncio.sleep(CHECK_INTERVAL)
 
-with client:
+if __name__ == '__main__':
     client.loop.run_until_complete(main())
-  
+    
