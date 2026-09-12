@@ -28,7 +28,7 @@ API_HASH = '5a7f2bfea72f4df4d0bd1e8291821148'
 TARGET_USERNAMES = ['EFE_E']
 
 # زمن الانتظار بين المحاولات (بالثواني)
-CHECK_INTERVAL = 6
+CHECK_INTERVAL = 10
 
 client = TelegramClient('session_claimer', API_ID, API_HASH)
 
